@@ -2,7 +2,13 @@
 # Production configuration for Fraud Detection API
 import os
 import uvicorn
-from fraud_detection_api import app
+import sys
+import os
+
+# Add src to Python path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+
+from src.api.fraud_detection_api import app
 
 if __name__ == "__main__":
     # Get port from environment variable (for cloud platforms)

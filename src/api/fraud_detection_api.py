@@ -8,11 +8,12 @@ import json
 import logging
 from datetime import datetime
 import uvicorn
-from fraud_detection_model import FraudDetectionModel
+from src.models.fraud_detection_model import FraudDetectionModel
 import joblib
 import hashlib
 from sklearn.preprocessing import LabelEncoder
 from sklearn.feature_extraction.text import TfidfVectorizer
+from fastapi.responses import JSONResponse
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -423,11 +424,11 @@ async def get_metrics():
 # Error handlers
 @app.exception_handler(404)
 async def not_found_handler(request, exc):
-    return {"error": "Endpoint not found", "detail": str(exc)}
+    return JSONResponse(status_code=404, content={"detail": "Not Found"})
 
 @app.exception_handler(500)
 async def internal_error_handler(request, exc):
-    return {"error": "Internal server error", "detail": str(exc)}
+    return JSONResponse(status_code=500, content={"detail": "Internal Server Error"})
 
 if __name__ == "__main__":
     uvicorn.run(
