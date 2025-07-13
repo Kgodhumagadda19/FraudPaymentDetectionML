@@ -1,0 +1,16 @@
+[Unit]
+Description=Fraud Detection API
+After=network.target
+
+[Service]
+Type=exec
+User=www-data
+Group=www-data
+WorkingDirectory=/path/to/your/api
+Environment=PATH=/path/to/your/api/venv/bin
+ExecStart=/path/to/your/api/venv/bin/python production_server.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
