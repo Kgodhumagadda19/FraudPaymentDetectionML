@@ -300,5 +300,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 For support, email support@frauddetection.com or create an issue in the GitHub repository.
 
 ---
-
-**Built with ❤️ for secure, scalable fraud detection** 
