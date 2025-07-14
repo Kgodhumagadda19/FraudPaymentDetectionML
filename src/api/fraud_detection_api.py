@@ -114,16 +114,22 @@ def process_transaction_for_prediction(df):
         processed_df['email_hash'] = processed_df['email'].apply(
             lambda x: hash(str(x)) % 10000 if pd.notna(x) else 0
         )
+    else:
+        processed_df['email_hash'] = 0
     
     if 'phone' in processed_df.columns:
         processed_df['phone_hash'] = processed_df['phone'].apply(
             lambda x: hash(str(x)) % 10000 if pd.notna(x) else 0
         )
+    else:
+        processed_df['phone_hash'] = 0
     
     if 'ssn' in processed_df.columns:
         processed_df['ssn_hash'] = processed_df['ssn'].apply(
             lambda x: hash(str(x)) % 10000 if pd.notna(x) else 0
         )
+    else:
+        processed_df['ssn_hash'] = 0
     
     # Extract features from IP addresses
     if 'ip_address' in processed_df.columns:
@@ -133,6 +139,9 @@ def process_transaction_for_prediction(df):
         processed_df['ip_network'] = processed_df['ip_address'].apply(
             lambda x: f"Network_{hash('.'.join(str(x).split('.')[:2])) % 100}" if pd.notna(x) and '.' in str(x) else "Network_0"
         )
+    else:
+        processed_df['ip_country'] = "Country_0"
+        processed_df['ip_network'] = "Network_0"
     
     # Extract features from addresses
     if 'address' in processed_df.columns:
@@ -142,31 +151,21 @@ def process_transaction_for_prediction(df):
         processed_df['address_state'] = processed_df['address'].apply(
             lambda x: x.split(',')[-1].strip()[:2] if pd.notna(x) and ',' in str(x) else 'Unknown'
         )
+    else:
+        processed_df['address_city'] = 'Unknown'
+        processed_df['address_state'] = 'Unknown'
     
-    # Extract text features
-    if 'user_agent' in processed_df.columns:
-        try:
-            tfidf = TfidfVectorizer(max_features=10, stop_words='english')
-            user_agent_features = tfidf.fit_transform(processed_df['user_agent'].fillna(''))
-            user_agent_array = user_agent_features.toarray()  # type: ignore
-            for i in range(user_agent_array.shape[1]):
-                processed_df[f'ua_feature_{i}'] = user_agent_array[:, i]
-        except Exception as e:
-            logger.warning(f"Could not extract user agent features: {e}")
-            for i in range(10):
-                processed_df[f'ua_feature_{i}'] = 0
+    # Device and browser features
+    processed_df['device_type'] = processed_df.get('device_type', 'desktop')
+    processed_df['browser_type'] = processed_df.get('browser_type', 'chrome')
     
-    if 'address' in processed_df.columns:
-        try:
-            tfidf = TfidfVectorizer(max_features=5, stop_words='english')
-            address_features = tfidf.fit_transform(processed_df['address'].fillna(''))
-            address_array = address_features.toarray()  # type: ignore
-            for i in range(address_array.shape[1]):
-                processed_df[f'addr_feature_{i}'] = address_array[:, i]
-        except Exception as e:
-            logger.warning(f"Could not extract address features: {e}")
-            for i in range(5):
-                processed_df[f'addr_feature_{i}'] = 0
+    # Customer ID hash
+    if 'user_id' in processed_df.columns:
+        processed_df['customer_id_hash'] = processed_df['user_id'].apply(
+            lambda x: hash(str(x)) % 10000 if pd.notna(x) else 0
+        )
+    else:
+        processed_df['customer_id_hash'] = 0
     
     # Create enhanced features
     if 'timestamp' in processed_df.columns:
@@ -179,6 +178,15 @@ def process_transaction_for_prediction(df):
         processed_df['day_cos'] = np.cos(2 * np.pi * processed_df['day_of_week'] / 7)
         processed_df['is_weekend'] = (processed_df['day_of_week'] >= 5).astype(int)
         processed_df['is_night'] = ((processed_df['hour'] >= 22) | (processed_df['hour'] <= 6)).astype(int)
+    else:
+        processed_df['hour'] = 12
+        processed_df['day_of_week'] = 0
+        processed_df['hour_sin'] = 0
+        processed_df['hour_cos'] = 1
+        processed_df['day_sin'] = 0
+        processed_df['day_cos'] = 1
+        processed_df['is_weekend'] = 0
+        processed_df['is_night'] = 0
     
     # Amount-based features
     if 'amount' in processed_df.columns:
@@ -189,12 +197,47 @@ def process_transaction_for_prediction(df):
         processed_df['is_high_value'] = (processed_df['amount'] > processed_df['amount'].quantile(0.95)).astype(int)
         processed_df['is_low_value'] = (processed_df['amount'] < processed_df['amount'].quantile(0.05)).astype(int)
         processed_df['is_very_high_value'] = (processed_df['amount'] > processed_df['amount'].quantile(0.99)).astype(int)
+    else:
+        processed_df['amount_log'] = 0
+        processed_df['amount_squared'] = 0
+        processed_df['amount_percentile'] = 0.5
+        processed_df['amount_zscore'] = 0
+        processed_df['is_high_value'] = 0
+        processed_df['is_low_value'] = 0
+        processed_df['is_very_high_value'] = 0
     
     # Behavioral features
-    processed_df['velocity_1h'] = processed_df.get('velocity_24h', 0) // 24
-    processed_df['velocity_6h'] = processed_df.get('velocity_24h', 0) // 4
-    processed_df['velocity_7d'] = processed_df.get('velocity_24h', 0) * 7
-    processed_df['high_velocity'] = (processed_df.get('velocity_24h', 0) > 10).astype(int)
+    velocity_24h = processed_df.get('velocity_24h', 0)
+    processed_df['velocity_1h'] = velocity_24h // 24
+    processed_df['velocity_6h'] = velocity_24h // 4
+    processed_df['velocity_7d'] = velocity_24h * 7
+    processed_df['high_velocity'] = (velocity_24h > 10).astype(int)
+    processed_df['very_high_velocity'] = (velocity_24h > 50).astype(int)
+    
+    # Additional features
+    processed_df['new_device'] = 0
+    processed_df['new_location'] = 0
+    processed_df['unusual_time'] = 0
+    processed_df['high_risk_merchant'] = processed_df.get('high_risk_merchant', False).astype(int)
+    processed_df['international_transaction'] = processed_df.get('foreign_transaction', False).astype(int)
+    processed_df['amount_time_interaction'] = 0
+    processed_df['device_location_risk'] = 0
+    processed_df['high_value_night'] = 0
+    processed_df['velocity_amount_risk'] = 0
+    processed_df['geo_risk'] = 0
+    processed_df['high_risk_country'] = 0
+    processed_df['customer_age_days'] = 365
+    processed_df['total_transactions'] = processed_df.get('transaction_count_user', 0)
+    processed_df['avg_transaction_amount'] = processed_df.get('amount', 0)
+    processed_df['transaction_frequency'] = 1
+    
+    # Text features (default values)
+    for i in range(10):
+        processed_df[f'ua_feature_{i}'] = 0
+    for i in range(5):
+        processed_df[f'addr_feature_{i}'] = 0
+    
+    return processed_df
     
     # Risk indicators
     processed_df['new_device'] = 0  # Default value
